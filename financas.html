@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minhas Economias</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .tab-button {
+            padding: 10px 20px;
+            background-color: #e2e8f0;
+            border-radius: 9999px;
+            font-weight: 500;
+            color: #4a5568;
+            transition: all 0.2s;
+        }
+        .tab-button.active {
+            background-color: #4a5568;
+            color: #fff;
+        }
+        .tab-button#tab-metas.active {
+            background-color: #2563eb;
+        }
+        .tab-button#tab-dividas.active {
+            background-color: #dc2626;
+        }
+        .progress-bar-container {
+            background-color: #e2e8f0;
+            border-radius: 9999px;
+            height: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            transition: width 0.4s ease;
+            border-radius: 9999px;
+        }
+        .hidden {
+            display: none;
+        }
+        .center-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            text-align: center;
+        }
+        .btn-loading {
+            position: relative;
+        }
+        .btn-loading:before {
+            content: '';
+            display: block;
+            width: 1em;
+            height: 1em;
+            border-radius: 50%;
+            border: 2px solid #fff;
+            border-top-color: transparent;
+            animation: spin 1s linear infinite;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            margin-top: -0.5em;
+            margin-left: -0.5em;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loading-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #2563eb;
+            animation: spin 1s ease infinite;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 relative">
+
+    <div id="loading-screen" class="loading-screen">
+        <div class="spinner"></div>
+        <p class="mt-4 text-gray-500">Carregando...</p>
+    </div>
+
+    <div id="main-app" class="container bg-white rounded-lg shadow-lg mt-8 p-6 hidden">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Minhas Economias</h1>
+        </div>
+        
+        <div class="absolute top-4 right-4 text-xs text-gray-500 flex items-center space-x-2">
+            <span id="moeda-atual" class="font-bold">AED</span>
+            <button id="btn-mudar-moeda" class="px-2 py-1 bg-gray-200 rounded-lg text-gray-600 hover:bg-gray-300 transition-colors">Mudar</button>
+        </div>
+
+        <div class="flex justify-center space-x-4 mb-6">
+            <button id="tab-home" class="tab-button active">Home</button>
+            <button id="tab-metas" class="tab-button">Metas</button>
+            <button id="tab-dividas" class="tab-button">Dívidas</button>
+            <button id="tab-historico" class="tab-button">Histórico</button>
+        </div>
+
+        <div id="content-home" class="tab-content">
+            <div class="bg-purple-600 text-white p-6 rounded-lg shadow-md mb-6 text-center">
+                <p class="text-lg">Total Geral</p>
+                <p id="total-geral" class="text-4xl font-bold mt-1">AED 0.00</p>
+            </div>
+
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Adicionar Transação</h2>
+            <div class="flex space-x-2 mb-4">
+                <button type="button" id="btn-entrada" class="flex-1 py-3 rounded-lg font-bold text-white bg-green-500 hover:bg-green-600 transition-colors">Entrada</button>
+                <button type="button" id="btn-saida" class="flex-1 py-3 rounded-lg font-bold text-white bg-gray-400">Saída</button>
+            </div>
+            
+            <form id="form-transacao" class="bg-gray-50 p-6 rounded-lg shadow-sm">
+                <div class="mb-4">
+                    <label for="valor" class="block text-gray-700 font-semibold mb-1">Valor:</label>
+                    <input type="number" id="valor" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="0.00" required>
+                </div>
+                <div class="mb-4">
+                    <label for="comentario" class="block text-gray-700 font-semibold mb-1">Comentário (opcional):</label>
+                    <input type="text" id="comentario" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Ex: Salário, Aluguel">
+                </div>
+                <button type="submit" class="w-full py-3 rounded-lg font-bold text-white bg-purple-500 hover:bg-purple-600 transition-colors">Adicionar</button>
+            </form>
+        </div>
+
+        <div id="content-metas" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700">Minhas Metas</h2>
+                <button type="button" id="btn-adicionar-meta" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">Adicionar Meta</button>
+            </div>
+            <form id="form-meta" class="mb-6 bg-gray-50 p-6 rounded-lg shadow-sm hidden">
+                <div class="mb-4">
+                    <label for="nome-meta" class="block text-gray-700 font-semibold mb-1">Motivo/Nome da Meta:</label>
+                    <input type="text" id="nome-meta" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="valor-meta" class="block text-gray-700 font-semibold mb-1">Valor do Objetivo (AED):</label>
+                    <input type="number" id="valor-meta" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                </div>
+                <button type="submit" class="w-full py-3 rounded-lg font-bold text-white bg-blue-500 hover:bg-blue-600 transition-colors">Criar Meta</button>
+            </form>
+            <div id="lista-metas" class="space-y-4"></div>
+        </div>
+        
+        <div id="content-dividas" class="tab-content hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold text-gray-700">Minhas Dívidas</h2>
+                <button type="button" id="btn-adicionar-divida" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">Adicionar Dívida</button>
+            </div>
+            <form id="form-divida" class="mb-6 bg-gray-50 p-6 rounded-lg shadow-sm hidden">
+                <div class="mb-4">
+                    <label for="nome-divida" class="block text-gray-700 font-semibold mb-1">Nome da Dívida:</label>
+                    <input type="text" id="nome-divida" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                </div>
+                <div class="mb-4">
+                    <label for="valor-divida" class="block text-gray-700 font-semibold mb-1">Valor Total da Dívida (AED):</label>
+                    <input type="number" id="valor-divida" step="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                </div>
+                <button type="submit" class="w-full py-3 rounded-lg font-bold text-white bg-red-500 hover:bg-red-600 transition-colors">Criar Dívida</button>
+            </form>
+            <div id="lista-dividas" class="space-y-4"></div>
+        </div>
+        
+        <div id="content-historico" class="tab-content hidden">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Histórico por Mês</h2>
+            
+            <div class="mb-4 flex justify-between items-center">
+                <button type="button" id="prev-month" class="px-4 py-2 bg-gray-200 rounded-lg">&lt;</button>
+                <h3 id="mes-atual" class="text-lg font-bold"></h3>
+                <button type="button" id="next-month" class="px-4 py-2 bg-gray-200 rounded-lg">&gt;</button>
+            </div>
+            
+            <div id="mes-total-container" class="bg-gray-200 p-4 rounded-lg text-center mb-4">
+                <p>Total do mês:</p>
+                <p id="mes-total" class="text-2xl font-bold">AED 0.00</p>
+            </div>
+
+            <div id="calendario" class="grid grid-cols-7 gap-1 text-center font-semibold text-sm mb-4">
+                <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+            </div>
+
+            <h3 class="text-lg font-semibold mt-6 mb-2">Transações do dia</h3>
+            <div id="transacoes-dia" class="space-y-2">
+                <p class="text-gray-500 text-center">Selecione uma data no calendário para ver as transações.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-container" class="modal-overlay hidden">
+        <div class="modal-content">
+            <p id="modal-message" class="text-lg mb-4"></p>
+            <button id="modal-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg">OK</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getFirestore, 
+            doc, 
+            addDoc, 
+            updateDoc, 
+            onSnapshot, 
+            collection, 
+            setLogLevel,
+            deleteDoc
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import {
+            getAuth,
+            signInAnonymously,
+            onAuthStateChanged
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+
+        // Variáveis globais do ambiente
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = {
+  apiKey: "AIzaSyD6nykAfrgcVw3OF1-R_4m8A6_oMQe6CYQ",
+  authDomain: "minhas-economias-4709b.firebaseapp.com",
+  projectId: "minhas-economias-4709b",
+  storageBucket: "minhas-economias-4709b.firebasestorage.app",
+  messagingSenderId: "532489720812",
+  appId: "1:532489720812:web:afe74c2423c4d8d0ef26c9",
+  measurementId: "G-RDYWH46DGT"
+};
+
+        // Elementos da UI
+        const loadingScreen = document.getElementById('loading-screen');
+        const mainApp = document.getElementById('main-app');
+        const totalGeralEl = document.getElementById('total-geral');
+        const formTransacao = document.getElementById('form-transacao');
+        const valorInput = document.getElementById('valor');
+        const comentarioInput = document.getElementById('comentario');
+        const btnEntrada = document.getElementById('btn-entrada');
+        const btnSaida = document.getElementById('btn-saida');
+        const formMeta = document.getElementById('form-meta');
+        const listaMetas = document.getElementById('lista-metas');
+        const formDivida = document.getElementById('form-divida');
+        const listaDividas = document.getElementById('lista-dividas');
+        const calendarioEl = document.getElementById('calendario');
+        const transacoesDiaEl = document.getElementById('transacoes-dia');
+        const mesAtualEl = document.getElementById('mes-atual');
+        const mesTotalEl = document.getElementById('mes-total');
+        const btnAdicionarMeta = document.getElementById('btn-adicionar-meta');
+        const btnAdicionarDivida = document.getElementById('btn-adicionar-divida');
+        const moedaAtualEl = document.getElementById('moeda-atual');
+        const btnMudarMoeda = document.getElementById('btn-mudar-moeda');
+
+        let app;
+        let db;
+        let auth;
+        let userId;
+
+        let transacoes = [];
+        let metas = [];
+        let dividas = [];
+
+        // Verifica se a configuração do Firebase está presente
+        if (Object.keys(firebaseConfig).length === 0) {
+            console.error("Configuração do Firebase em falta. A aplicação não pode ser executada.");
+            document.body.innerHTML = '<div class="container text-center mt-20 text-red-500">Erro: Configuração do Firebase não encontrada.</div>';
+        } else {
+            // Inicializa o Firebase
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            setLogLevel('debug');
+        }
+        
+        // Função para obter o caminho da coleção no Firestore, usando a área de dados do utilizador
+        function getCollectionPath(collectionName) {
+            if (!userId) {
+                console.error("userId não está disponível. Não é possível obter o caminho da coleção.");
+                return null;
+            }
+            const path = `artifacts/${appId}/users/${userId}/${collectionName}`;
+            console.log("Caminho da coleção:", path);
+            return path;
+        }
+
+        // Configura os ouvintes do Firestore para atualizações em tempo real
+        function setupFirestoreListeners() {
+            if (!userId) return;
+
+            // Transações
+            onSnapshot(collection(db, getCollectionPath('transacoes')), (snapshot) => {
+                transacoes = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderizarTotalGeral();
+                // Também renderiza o histórico para refletir as alterações
+                renderizarCalendario();
+                renderizarMesTotal();
+            }, (error) => {
+                console.error("Erro ao buscar transações:", error);
+                showModal("Erro ao carregar transações. Verifique a sua ligação à internet.");
+            });
+
+            // Metas
+            onSnapshot(collection(db, getCollectionPath('metas')), (snapshot) => {
+                metas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderizarMetas();
+            }, (error) => {
+                console.error("Erro ao buscar metas:", error);
+                showModal("Erro ao carregar metas. Verifique a sua ligação à internet.");
+            });
+
+            // Dívidas
+            onSnapshot(collection(db, getCollectionPath('dividas')), (snapshot) => {
+                dividas = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderizarDividas();
+            }, (error) => {
+                console.error("Erro ao buscar dívidas:", error);
+                showModal("Erro ao carregar dívidas. Verifique a sua ligação à internet.");
+            });
+        }
+        
+        // Modal personalizado
+        function showModal(message) {
+            const modalContainer = document.getElementById('modal-container');
+            const modalMessage = document.getElementById('modal-message');
+            const modalBtn = document.getElementById('modal-btn');
+            modalMessage.textContent = message;
+            modalContainer.classList.remove('hidden');
+            modalBtn.onclick = () => {
+                modalContainer.classList.add('hidden');
+            };
+        }
+        
+        // Estado da aplicação
+        let tipoTransacao = 'entrada';
+        let dataAtual = new Date();
+        const moedas = ['AED', 'BRL', 'USD', 'EUR'];
+        let moedaIndex = 0;
+
+        // Alterna entre as abas principais
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+                button.classList.add('active');
+                document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
+                document.getElementById('content-' + button.id.replace('tab-', '')).classList.remove('hidden');
+                
+                if (button.id === 'tab-home') {
+                    renderizarTotalGeral();
+                } else if (button.id === 'tab-metas') {
+                    renderizarMetas();
+                } else if (button.id === 'tab-dividas') {
+                    renderizarDividas();
+                } else if (button.id === 'tab-historico') {
+                    renderizarCalendario();
+                    renderizarMesTotal();
+                }
+            });
+        });
+
+        // Alterna entre entrada e saída
+        btnEntrada.addEventListener('click', () => {
+            tipoTransacao = 'entrada';
+            btnEntrada.classList.add('bg-green-500', 'hover:bg-green-600');
+            btnEntrada.classList.remove('bg-gray-400');
+            btnSaida.classList.add('bg-gray-400');
+            btnSaida.classList.remove('bg-red-500', 'hover:bg-red-600');
+        });
+
+        btnSaida.addEventListener('click', () => {
+            tipoTransacao = 'saida';
+            btnSaida.classList.add('bg-red-500', 'hover:bg-red-600');
+            btnSaida.classList.remove('bg-gray-400');
+            btnEntrada.classList.add('bg-gray-400');
+            btnEntrada.classList.remove('bg-green-500', 'hover:bg-green-600');
+        });
+        
+        // Função para formatar valores com a moeda selecionada
+        function formatarValor(valor) {
+            return `${moedas[moedaIndex]} ${valor.toFixed(2)}`;
+        }
+
+        // Altera a moeda
+        btnMudarMoeda.addEventListener('click', () => {
+            moedaIndex = (moedaIndex + 1) % moedas.length;
+            moedaAtualEl.textContent = moedas[moedaIndex];
+            renderizarTotalGeral();
+            renderizarMetas();
+            renderizarDividas();
+            renderizarMesTotal();
+        });
+
+        // Renderiza o total geral
+        function renderizarTotalGeral() {
+            const total = transacoes.reduce((acc, transacao) => {
+                return acc + (transacao.tipo === 'entrada' ? transacao.valor : -transacao.valor);
+            }, 0);
+            totalGeralEl.textContent = formatarValor(total);
+            if (total < 0) {
+                totalGeralEl.classList.remove('text-purple-500');
+                totalGeralEl.classList.add('text-red-500');
+            } else {
+                totalGeralEl.classList.remove('text-red-500');
+                totalGeralEl.classList.add('text-purple-500');
+            }
+        }
+
+        // Adiciona uma nova transação ao Firestore
+        formTransacao.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const valor = parseFloat(valorInput.value);
+            const comentario = comentarioInput.value;
+
+            if (isNaN(valor) || valor <= 0) {
+                showModal('Por favor, insira um valor válido.');
+                return;
+            }
+
+            const novaTransacao = {
+                valor,
+                comentario,
+                tipo: tipoTransacao,
+                data: new Date().toISOString()
+            };
+
+            try {
+                if (getCollectionPath('transacoes')) {
+                    await addDoc(collection(db, getCollectionPath('transacoes')), novaTransacao);
+                }
+            } catch(e) {
+                console.error("Erro ao adicionar transação:", e);
+                showModal("Erro ao adicionar transação. Tente novamente.");
+            }
+            
+            valorInput.value = '';
+            comentarioInput.value = '';
+        });
+
+        // Alterna a visibilidade do formulário de metas
+        btnAdicionarMeta.addEventListener('click', () => {
+            formMeta.classList.toggle('hidden');
+        });
+
+        // Adiciona uma nova meta ao Firestore
+        formMeta.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nome = document.getElementById('nome-meta').value;
+            const valor = parseFloat(document.getElementById('valor-meta').value);
+            
+            if (!nome || isNaN(valor) || valor <= 0) {
+                showModal('Por favor, insira um nome e um valor válidos para a meta.');
+                return;
+            }
+
+            const novaMeta = { nome, valor, valorAtual: 0 };
+            try {
+                if (getCollectionPath('metas')) {
+                    await addDoc(collection(db, getCollectionPath('metas')), novaMeta);
+                }
+            } catch(e) {
+                console.error("Erro ao adicionar meta:", e);
+                showModal("Erro ao adicionar meta. Tente novamente.");
+            }
+            
+            formMeta.reset();
+            formMeta.classList.add('hidden');
+        });
+
+        // Renderiza metas do Firestore
+        function renderizarMetas() {
+            listaMetas.innerHTML = '';
+            if (metas.length === 0) {
+                listaMetas.innerHTML = `<p class="text-gray-500 text-center">Nenhuma meta adicionada.</p>`;
+            }
+            metas.forEach((meta) => {
+                const porcentagem = (meta.valorAtual / meta.valor) * 100;
+                const metaEl = document.createElement('div');
+                metaEl.classList.add('bg-white', 'p-4', 'rounded-lg', 'shadow-sm', 'border', 'border-gray-200');
+                metaEl.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="font-bold text-gray-800">${meta.nome}</p>
+                        <button class="btn-excluir-meta text-red-500 hover:text-red-700 transition-colors" data-id="${meta.id}">Excluir</button>
+                    </div>
+                    <p class="text-lg font-semibold">${formatarValor(meta.valorAtual)} / ${formatarValor(meta.valor)}</p>
+                    <div class="progress-bar-container mt-2">
+                        <div class="progress-bar bg-blue-300" style="width: ${Math.min(porcentagem, 100)}%;"></div>
+                    </div>
+                    <div class="flex items-center space-x-2 mt-4">
+                        <input type="number" class="w-24 px-2 py-1 border rounded text-sm" placeholder="Adicionar" id="add-valor-meta-${meta.id}">
+                        <button class="add-meta-btn px-3 py-1 bg-green-500 text-white rounded-lg text-sm" data-id="${meta.id}">Adicionar</button>
+                    </div>
+                `;
+                listaMetas.appendChild(metaEl);
+            });
+            document.querySelectorAll('.add-meta-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    const input = document.getElementById(`add-valor-meta-${id}`);
+                    const valorAdicionado = parseFloat(input.value);
+                    if (valorAdicionado > 0) {
+                        const meta = metas.find(m => m.id === id);
+                        if (meta) {
+                            try {
+                                if (getCollectionPath('metas')) {
+                                    await updateDoc(doc(db, getCollectionPath('metas'), id), {
+                                        valorAtual: meta.valorAtual + valorAdicionado
+                                    });
+                                }
+                            } catch(e) {
+                                console.error("Erro ao atualizar meta:", e);
+                                showModal("Erro ao atualizar meta. Tente novamente.");
+                            }
+                            input.value = '';
+                        }
+                    }
+                });
+            });
+
+            document.querySelectorAll('.btn-excluir-meta').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    try {
+                        if (getCollectionPath('metas')) {
+                            await deleteDoc(doc(db, getCollectionPath('metas'), id));
+                        }
+                    } catch(e) {
+                        console.error("Erro ao excluir meta:", e);
+                        showModal("Erro ao excluir meta. Tente novamente.");
+                    }
+                });
+            });
+        }
+
+        // Alterna a visibilidade do formulário de dívidas
+        btnAdicionarDivida.addEventListener('click', () => {
+            formDivida.classList.toggle('hidden');
+        });
+
+        // Adiciona uma nova dívida ao Firestore
+        formDivida.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nome = document.getElementById('nome-divida').value;
+            const valor = parseFloat(document.getElementById('valor-divida').value);
+            
+            if (!nome || isNaN(valor) || valor <= 0) {
+                showModal('Por favor, insira um nome e um valor válidos para a dívida.');
+                return;
+            }
+
+            const novaDivida = { nome, valor, valorPago: 0, historico: [], dataAdicao: new Date().toISOString() };
+            try {
+                if (getCollectionPath('dividas')) {
+                    await addDoc(collection(db, getCollectionPath('dividas')), novaDivida);
+                }
+            } catch(e) {
+                console.error("Erro ao adicionar dívida:", e);
+                showModal("Erro ao adicionar dívida. Tente novamente.");
+            }
+            
+            formDivida.reset();
+            formDivida.classList.add('hidden');
+        });
+
+        // Renderiza dívidas do Firestore
+        function renderizarDividas() {
+            listaDividas.innerHTML = '';
+            if (dividas.length === 0) {
+                listaDividas.innerHTML = `<p class="text-gray-500 text-center">Nenhuma dívida adicionada.</p>`;
+            }
+            dividas.forEach((divida) => {
+                const porcentagem = (divida.valorPago / divida.valor) * 100;
+                const dividaEl = document.createElement('div');
+                dividaEl.classList.add('bg-white', 'p-4', 'rounded-lg', 'shadow-sm', 'border', 'border-gray-200');
+                dividaEl.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <p class="font-bold text-gray-800">${divida.nome}</p>
+                        <button class="btn-excluir-divida text-red-500 hover:text-red-700 transition-colors" data-id="${divida.id}">Excluir</button>
+                    </div>
+                    <p class="text-lg font-semibold">${formatarValor(divida.valorPago)} / ${formatarValor(divida.valor)}</p>
+                    <div class="progress-bar-container mt-2 mb-4">
+                        <div class="progress-bar bg-red-500" style="width: ${Math.min(porcentagem, 100)}%;"></div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2 mt-4">
+                        <input type="number" class="w-24 px-2 py-1 border rounded text-sm" placeholder="Valor" id="add-pago-divida-${divida.id}">
+                        <input type="text" class="flex-1 px-2 py-1 border rounded text-sm" placeholder="Motivo (opcional)" id="motivo-pago-divida-${divida.id}">
+                        <button class="add-pago-btn px-3 py-1 bg-blue-500 text-white rounded-lg text-sm" data-id="${divida.id}">Pagar</button>
+                        <button class="add-total-pago-btn px-3 py-1 bg-green-500 text-white rounded-lg text-sm" data-id="${divida.id}">Pagar Total</button>
+                        <button class="add-divida-btn px-3 py-1 bg-red-500 text-white rounded-lg text-sm" data-id="${divida.id}">+</button>
+                    </div>
+
+                    <div class="mt-4">
+                        <button class="toggle-historico-btn text-sm text-blue-500 hover:underline" data-id="${divida.id}">Ver Histórico (${divida.historico.length})</button>
+                        <div class="historico-container hidden mt-2 space-y-2" id="historico-divida-${divida.id}"></div>
+                    </div>
+                `;
+                listaDividas.appendChild(dividaEl);
+            });
+            
+            document.querySelectorAll('.add-pago-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    const inputValor = document.getElementById(`add-pago-divida-${id}`);
+                    const inputMotivo = document.getElementById(`motivo-pago-divida-${id}`);
+                    const valorPago = parseFloat(inputValor.value);
+                    const motivo = inputMotivo.value;
+
+                    if (valorPago > 0) {
+                        const divida = dividas.find(d => d.id === id);
+                        if (divida) {
+                            const novoHistorico = [...divida.historico, {
+                                valor: valorPago,
+                                motivo: motivo,
+                                tipo: 'pagamento',
+                                data: new Date().toISOString()
+                            }];
+                            try {
+                                if (getCollectionPath('dividas')) {
+                                    await updateDoc(doc(db, getCollectionPath('dividas'), id), {
+                                        valorPago: divida.valorPago + valorPago,
+                                        historico: novoHistorico
+                                    });
+                                }
+                            } catch(e) {
+                                console.error("Erro ao atualizar dívida:", e);
+                                showModal("Erro ao atualizar dívida. Tente novamente.");
+                            }
+                            inputValor.value = '';
+                            inputMotivo.value = '';
+                        }
+                    }
+                });
+            });
+
+            document.querySelectorAll('.add-total-pago-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    const divida = dividas.find(d => d.id === id);
+
+                    if (divida) {
+                        const valorRestante = divida.valor - divida.valorPago;
+                        if (valorRestante > 0) {
+                            const novoHistorico = [...divida.historico, {
+                                valor: valorRestante,
+                                motivo: 'Pagamento total',
+                                tipo: 'pagamento',
+                                data: new Date().toISOString()
+                            }];
+                            try {
+                                if (getCollectionPath('dividas')) {
+                                    await updateDoc(doc(db, getCollectionPath('dividas'), id), {
+                                        valorPago: divida.valorPago + valorRestante,
+                                        historico: novoHistorico
+                                    });
+                                }
+                            } catch(e) {
+                                console.error("Erro ao atualizar dívida:", e);
+                                showModal("Erro ao atualizar dívida. Tente novamente.");
+                            }
+                        }
+                    }
+                });
+            });
+
+            document.querySelectorAll('.add-divida-btn').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    const inputValor = document.getElementById(`add-pago-divida-${id}`);
+                    const inputMotivo = document.getElementById(`motivo-pago-divida-${id}`);
+                    const valorAdicionado = parseFloat(inputValor.value);
+                    const motivo = inputMotivo.value;
+                    
+                    if (valorAdicionado > 0) {
+                        const divida = dividas.find(d => d.id === id);
+                        if (divida) {
+                            const novoHistorico = [...divida.historico, {
+                                valor: valorAdicionado,
+                                motivo: motivo,
+                                tipo: 'adicao',
+                                data: new Date().toISOString()
+                            }];
+                            try {
+                                if (getCollectionPath('dividas')) {
+                                    await updateDoc(doc(db, getCollectionPath('dividas'), id), {
+                                        valor: divida.valor + valorAdicionado,
+                                        historico: novoHistorico
+                                    });
+                                }
+                            } catch(e) {
+                                console.error("Erro ao atualizar dívida:", e);
+                                showModal("Erro ao atualizar dívida. Tente novamente.");
+                            }
+                            inputValor.value = '';
+                            inputMotivo.value = '';
+                        }
+                    }
+                });
+            });
+
+            document.querySelectorAll('.btn-excluir-divida').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    const id = e.target.dataset.id;
+                    try {
+                        if (getCollectionPath('dividas')) {
+                            await deleteDoc(doc(db, getCollectionPath('dividas'), id));
+                        }
+                    } catch(e) {
+                        console.error("Erro ao excluir dívida:", e);
+                        showModal("Erro ao excluir dívida. Tente novamente.");
+                    }
+                });
+            });
+            
+            document.querySelectorAll('.toggle-historico-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const id = e.target.dataset.id;
+                    const historicoEl = document.getElementById(`historico-divida-${id}`);
+                    const divida = dividas.find(d => d.id === id);
+                    
+                    if (historicoEl.classList.contains('hidden')) {
+                        historicoEl.classList.remove('hidden');
+                        renderizarHistoricoDivida(divida, historicoEl);
+                        e.target.textContent = `Esconder Histórico (${divida.historico.length})`;
+                    } else {
+                        historicoEl.classList.add('hidden');
+                        e.target.textContent = `Ver Histórico (${divida.historico.length})`;
+                    }
+                });
+            });
+        }
+        
+        function renderizarHistoricoDivida(divida, containerEl) {
+            containerEl.innerHTML = '';
+            divida.historico.forEach(pagamento => {
+                const itemEl = document.createElement('div');
+                let texto, cor;
+                if (pagamento.tipo === 'adicao') {
+                    texto = `Adicionado ${formatarValor(pagamento.valor)}`;
+                    cor = 'bg-red-100 text-red-600';
+                } else {
+                    texto = `Pago ${formatarValor(pagamento.valor)}`;
+                    cor = 'bg-green-100 text-green-600';
+                }
+                itemEl.classList.add(...cor.split(' ')); 
+                itemEl.classList.add('p-3', 'rounded-lg', 'text-sm');
+                itemEl.innerHTML = `
+                    <p class="font-bold">${pagamento.motivo || 'Sem motivo'}</p>
+                    <p class="text-sm text-gray-500">${new Date(pagamento.data).toLocaleDateString()} às ${new Date(pagamento.data).toLocaleTimeString()}</p>
+                    <p class="font-bold ${cor}">${texto}</p>
+                `;
+                containerEl.appendChild(itemEl);
+            });
+        }
+
+        // Renderiza o calendário
+        function renderizarCalendario() {
+            calendarioEl.innerHTML = `
+                <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+            `;
+            mesAtualEl.textContent = dataAtual.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+            
+            const ano = dataAtual.getFullYear();
+            const mes = dataAtual.getMonth();
+            const primeiroDia = new Date(ano, mes, 1);
+            const ultimoDia = new Date(ano, mes + 1, 0);
+            
+            const primeiroDiaSemana = primeiroDia.getDay();
+            
+            for (let i = 0; i < primeiroDiaSemana; i++) {
+                const divVazia = document.createElement('div');
+                calendarioEl.appendChild(divVazia);
+            }
+            
+            for (let i = 1; i <= ultimoDia.getDate(); i++) {
+                const diaEl = document.createElement('div');
+                diaEl.textContent = i;
+                diaEl.classList.add('p-2', 'rounded-full', 'cursor-pointer', 'hover:bg-gray-200', 'transition-colors');
+                diaEl.dataset.dia = i;
+                diaEl.dataset.mes = mes;
+                diaEl.dataset.ano = ano;
+                
+                const temTransacao = transacoes.some(t => {
+                    const dataTransacao = new Date(t.data);
+                    return dataTransacao.getFullYear() === ano && dataTransacao.getMonth() === mes && dataTransacao.getDate() === i;
+                });
+
+                if (temTransacao) {
+                    diaEl.classList.add('relative');
+                    diaEl.innerHTML += `<span class="absolute bottom-1 right-1 h-2 w-2 bg-blue-500 rounded-full"></span>`;
+                }
+
+                diaEl.addEventListener('click', (e) => {
+                    const dia = e.target.dataset.dia;
+                    const mes = e.target.dataset.mes;
+                    const ano = e.target.dataset.ano;
+                    
+                    const dataSelecionada = new Date(ano, mes, dia);
+                    mostrarTransacoesDia(dataSelecionada);
+                    
+                    document.querySelectorAll('#calendario div').forEach(d => d.classList.remove('bg-blue-200'));
+                    e.target.classList.add('bg-blue-200');
+                });
+                calendarioEl.appendChild(diaEl);
+            }
+        }
+        
+        // Renderiza o total do mês
+        function renderizarMesTotal() {
+            const ano = dataAtual.getFullYear();
+            const mes = dataAtual.getMonth();
+            
+            const transacoesMes = transacoes.filter(t => {
+                const dataTransacao = new Date(t.data);
+                return dataTransacao.getFullYear() === ano && dataTransacao.getMonth() === mes;
+            });
+
+            const total = transacoesMes.reduce((acc, transacao) => {
+                return acc + (transacao.tipo === 'entrada' ? transacao.valor : -transacao.valor);
+            }, 0);
+            
+            mesTotalEl.textContent = formatarValor(total);
+        }
+
+        // Botões de navegação do calendário
+        document.getElementById('prev-month').addEventListener('click', () => {
+            dataAtual.setMonth(dataAtual.getMonth() - 1);
+            renderizarCalendario();
+            renderizarMesTotal();
+        });
+        document.getElementById('next-month').addEventListener('click', () => {
+            dataAtual.setMonth(dataAtual.getMonth() + 1);
+            renderizarCalendario();
+            renderizarMesTotal();
+        });
+
+        // Mostra as transações do dia
+        function mostrarTransacoesDia(data) {
+            transacoesDiaEl.innerHTML = '';
+            const transacoesFiltradas = transacoes.filter(t => {
+                const dataTransacao = new Date(t.data);
+                return dataTransacao.getFullYear() === data.getFullYear() && dataTransacao.getMonth() === data.getMonth() && dataTransacao.getDate() === data.getDate();
+            });
+
+            if (transacoesFiltradas.length === 0) {
+                transacoesDiaEl.innerHTML = `<p class="text-gray-500 text-center">Nenhuma transação para este dia.</p>`;
+                return;
+            }
+
+            transacoesFiltradas.forEach(transacao => {
+                const itemEl = document.createElement('div');
+                const cor = transacao.tipo === 'entrada' ? 'text-green-600' : 'text-red-600';
+                const sinal = transacao.tipo === 'entrada' ? '+' : '-';
+                itemEl.classList.add('bg-white', 'p-4', 'rounded-lg', 'shadow-sm', 'border', 'border-gray-200', 'flex', 'justify-between', 'items-center');
+                itemEl.innerHTML = `
+                    <div>
+                        <p class="font-bold">${transacao.comentario || 'Sem comentário'}</p>
+                        <p class="text-sm text-gray-500">${new Date(transacao.data).toLocaleTimeString()}</p>
+                    </div>
+                    <p class="font-bold ${cor}">${sinal}${formatarValor(transacao.valor)}</p>
+                `;
+                transacoesDiaEl.appendChild(itemEl);
+            });
+        }
+        
+        // Inicialização da aplicação
+        document.addEventListener('DOMContentLoaded', () => {
+            // Inicia o processo de login anônimo
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // Usuário autenticado anonimamente.
+                    userId = user.uid;
+                    loadingScreen.classList.add('hidden');
+                    mainApp.classList.remove('hidden');
+                    setupFirestoreListeners();
+                    
+                    document.getElementById('tab-home').classList.add('active');
+                    document.getElementById('content-home').classList.remove('hidden');
+
+                    let tipoTransacao = 'entrada';
+                    btnEntrada.classList.add('bg-green-500', 'hover:bg-green-600');
+                    btnEntrada.classList.remove('bg-gray-400');
+                    btnSaida.classList.add('bg-gray-400');
+                    btnSaida.classList.remove('bg-red-500', 'hover:bg-red-600');
+
+                    renderizarCalendario();
+                    renderizarMesTotal();
+                } else {
+                    // Sem usuário logado, tenta o login anônimo
+                    signInAnonymously(auth).catch((error) => {
+                        console.error("Erro no login anônimo:", error);
+                        showModal("Erro ao conectar à base de dados. Tente novamente.");
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
